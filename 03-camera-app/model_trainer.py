@@ -1,0 +1,175 @@
+import json
+import os
+from pathlib import Path
+
+import cv2
+import numpy as np
+from keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from keras.layers import Conv2D, Dense, Dropout, Flatten, MaxPooling2D, RandomContrast, RandomFlip
+from keras.metrics import categorical_crossentropy
+from keras.models import Sequential
+from keras.utils import to_categorical
+from sklearn.model_selection import train_test_split
+
+from tqdm import tqdm
+
+from constants import *
+
+annotations = dict()
+
+for condition in CONDITIONS:
+    with open(f'../data/_annotations/{condition}.json') as f:
+        annotations[condition] = json.load(f)
+
+
+def preprocess_image(img):
+    if COLOR_CHANNELS == 1:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img_resized = cv2.resize(img, SIZE)
+    return img_resized
+
+
+images = []  # stores actual image data
+# stores labels (as integer - because this is what our network needs)
+labels = []
+# maps label ints to their actual categories so we can understand predictions later
+label_names = CONDITIONS.copy()
+
+# loop over all conditions
+# loop over all files in the condition's directory
+# read the image and corresponding annotation
+# crop image to the region of interest
+# preprocess image
+# store preprocessed image and label in corresponding lists
+for condition in CONDITIONS:
+    for filename in tqdm(os.listdir(f'../data/{condition}')):
+        # extract unique ID from file name
+        UID = filename.split('.')[0]
+        img = cv2.imread(f'../data/{condition}/{filename}')
+
+        # get annotation from the dict we loaded earlier
+        try:
+            annotation = annotations[condition][UID]
+        except Exception as e:
+            print(e)
+            continue
+
+        # iterate over all hands annotated in the image
+        for i, bbox in enumerate(annotation['bboxes']):
+            # annotated bounding boxes are in the range from 0 to 1
+            # therefore we have to scale them to the image size
+            x1 = int(bbox[0] * img.shape[1])
+            y1 = int(bbox[1] * img.shape[0])
+            w = int(bbox[2] * img.shape[1])
+            h = int(bbox[3] * img.shape[0])
+            x2 = x1 + w
+            y2 = y1 + h
+
+            # crop image to the bounding box and apply pre-processing
+            crop = img[y1:y2, x1:x2]
+            preprocessed = preprocess_image(crop)
+
+            # get the annotated hand's label
+            # if we have not seen this label yet, add it to the list of labels
+            label = annotation['labels'][i]
+            if label == "no_gesture":
+                continue
+
+            label_index = label_names.index(label)
+
+            images.append(preprocessed)
+            labels.append(label_index)
+
+
+X_train, X_test, y_train, y_test = train_test_split(
+    images, labels, test_size=0.2, random_state=42)
+
+
+X_train = np.array(X_train).astype('float32')
+X_train = X_train / 255.
+
+X_test = np.array(X_test).astype('float32')
+X_test = X_test / 255.
+
+y_train_one_hot = to_categorical(y_train)
+y_test_one_hot = to_categorical(y_test)
+
+train_label = y_train_one_hot
+test_label = y_test_one_hot
+
+X_train = X_train.reshape(-1, IMG_SIZE, IMG_SIZE, COLOR_CHANNELS)
+X_test = X_test.reshape(-1, IMG_SIZE, IMG_SIZE, COLOR_CHANNELS)
+
+
+def build_model():
+
+    num_classes = len(label_names)
+    activation = ACTIVATION
+    activation_conv = 'LeakyReLU'  # LeakyReLU doesn't work -> relu is used
+    layer_count = LAYER_COUNT
+    num_neurons = NUM_NEURONS
+
+    # define model structure
+    # with keras, we can use a model's add() function to add layers to the network one by one
+    model = Sequential()
+
+    # data augmentation (this can also be done beforehand - but don't augment the test dataset!)
+    model.add(RandomFlip('horizontal'))
+    model.add(RandomContrast(0.1))
+    # model.add(RandomBrightness(0.1))
+    # model.add(RandomRotation(0.2))
+
+    # first, we add some convolution layers followed by max pooling
+    model.add(Conv2D(64, kernel_size=(9, 9), activation=activation,
+              input_shape=(SIZE[0], SIZE[1], COLOR_CHANNELS), padding='same'))
+    model.add(MaxPooling2D(pool_size=(4, 4), padding='same'))
+
+    model.add(Conv2D(32, (5, 5), activation=activation, padding='same'))
+    model.add(MaxPooling2D(pool_size=(3, 3), padding='same'))
+
+    model.add(Conv2D(32, (3, 3), activation=activation, padding='same'))
+    model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+
+    # dropout layers can drop part of the data during each epoch - this prevents overfitting
+    model.add(Dropout(0.2))
+
+    # after the convolution layers, we have to flatten the data so it can be fed into fully connected layers
+    model.add(Flatten())
+
+    # add some fully connected layers ("Dense")
+    for i in range(layer_count - 1):
+        model.add(Dense(num_neurons, activation=activation))
+
+    model.add(Dense(num_neurons, activation=activation))
+
+    # for classification, the last layer has to use the softmax activation function, which gives us probabilities for each category
+    model.add(Dense(num_classes, activation='softmax'))
+
+    # specify loss function, optimizer and evaluation metrics
+    # for classification, categorial crossentropy is used as a loss function
+    # use the adam optimizer unless you have a good reason not to
+    model.compile(loss=categorical_crossentropy,
+                  optimizer="adam", metrics=['accuracy'])
+
+    return model
+
+
+model = build_model()
+
+
+reduce_lr = ReduceLROnPlateau(
+    monitor='val_loss', factor=0.2, patience=2, min_lr=0.0001)
+stop_early = EarlyStopping(monitor='val_loss', patience=3)
+
+model.fit(
+    X_train,
+    train_label,
+    batch_size=BATCH_SIZE,
+    epochs=EPOCHS,
+    verbose=1,
+    validation_data=(X_test, test_label),
+    callbacks=[reduce_lr, stop_early]
+)
+
+
+model.save('gesture_recognition.keras')
