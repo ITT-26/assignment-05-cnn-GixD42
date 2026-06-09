@@ -19,10 +19,14 @@ from tqdm import tqdm
 
 from constants import *
 
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR.parent / 'data'
+MODEL_REL_PATH = BASE_DIR / MODEL_PATH
+
 annotations = dict()
 
 for condition in CONDITIONS:
-    with open(f'../data/_annotations/{condition}.json') as f:
+    with open(DATA_DIR / f'_annotations/{condition}.json') as f:
         annotations[condition] = json.load(f)
 
 
@@ -46,10 +50,10 @@ label_names = CONDITIONS.copy()
 # preprocess image
 # store preprocessed image and label in corresponding lists
 for condition in CONDITIONS:
-    for filename in tqdm(os.listdir(f'../data/{condition}')):
+    for filename in tqdm(os.listdir(DATA_DIR / condition)):
         # extract unique ID from file name
         UID = filename.split('.')[0]
-        img = cv2.imread(f'../data/{condition}/{filename}')
+        img = cv2.imread(str(DATA_DIR / condition / filename))
 
         # get annotation from the dict we loaded earlier
         try:
@@ -115,7 +119,7 @@ def build_model():
     activation_conv = 'leaky_relu'
     layer_count = LAYER_COUNT
     num_neurons = NUM_NEURONS
-    dropout = 0.05
+    dropout = DROPOUT
 
     # define model structure
     # with keras, we can use a model's add() function to add layers to the network one by one
@@ -182,4 +186,4 @@ model.fit(
 )
 
 # save the model
-model.save(MODEL_PATH)
+model.save(str(MODEL_REL_PATH))

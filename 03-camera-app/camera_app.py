@@ -1,11 +1,18 @@
 import time
+from datetime import datetime
 from collections import Counter, deque
+from pathlib import Path
 
 import cv2
 import numpy as np
 from keras.models import load_model
 
 from constants import *
+
+
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH_REL = BASE_DIR / MODEL_PATH
+SELFIE_PATH_REL = BASE_DIR / SELFIE_PATH
 
 
 # same preprocessing as in training
@@ -20,7 +27,7 @@ def preprocess_image(img):
 def crop_input_area(frame):
     h, w = frame.shape[:2]
 
-    x1 = CROP_MARGIN
+    x1 = w - CROP_WIDTH - CROP_MARGIN
     y1 = h - CROP_HEIGHT - CROP_MARGIN
 
     x1 = max(0, min(x1, w - 1))
@@ -46,6 +53,9 @@ def capture_background(cap):
         if not ret:
             continue
 
+        if CAMERA_FLIP:
+            frame = cv2.flip(frame, 1)
+
         # crop to the input square
         input_area, _ = crop_input_area(frame)
         if input_area is None or input_area.size == 0:
@@ -61,11 +71,11 @@ def capture_background(cap):
         # put text to show that the background is being captured
         cv2.putText(
             frame,
-            f"Calibrating background, try not to move... {remaining:.1f}s",
+            f"Calibrating background... {remaining:.1f}s",
             (20, 40),
             cv2.FONT_HERSHEY_SIMPLEX,
             1,
-            (0, 255, 255),
+            (0, 255, 0),
             2,
         )
 
@@ -116,7 +126,7 @@ def crop_hand_with_static_bg(input_area, background):
 
 def main():
     # load the model and labels
-    model = load_model(MODEL_PATH)
+    model = load_model(str(MODEL_PATH_REL))
     labels = CONDITIONS
 
     # get video
@@ -128,8 +138,16 @@ def main():
     background = capture_background(cap)
 
     # for voting
-    last_label = None
     label_history = deque(maxlen=VOTE_WINDOW)
+
+    # for activating funcitonality
+    hold_label = None
+    hold_start_time = 0
+    last_gesture_time = 0
+
+    # for selfie countdown
+    selfie_trigger = False
+    selfie_countdown_end = 0
 
     # loop
     while True:
@@ -138,6 +156,12 @@ def main():
         ret, frame = cap.read()
         if not ret:
             break
+
+        if CAMERA_FLIP:
+            frame = cv2.flip(frame, 1)
+
+        # frame without ui elements
+        clean_frame = frame.copy()
 
         # crop to input square and crop hand with background subtraction
         input_area, (rx1, ry1, rx2, ry2) = crop_input_area(frame)
@@ -169,6 +193,83 @@ def main():
 
         # voted label is the most common label in the history
         voted_label = Counter(label_history).most_common(1)[0][0]
+
+        # logic for activating functionality
+        now = time.time()
+
+        # if a selfie is about to be taken, nothing else should be happening
+        if selfie_trigger:
+
+            # remaining time
+            remaining = selfie_countdown_end - now
+            remaining_sec = int(np.ceil(remaining))
+
+            # show countdown
+            if remaining_sec > 0:
+                cv2.putText(
+                    clean_frame,
+                    f"Taking selfie in {remaining_sec}...",
+                    (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (0, 255, 0),
+                    2,
+                )
+
+            # countdown is over -> take selfie
+            if remaining <= 0:
+                # timestamp for unique filename
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                out_path = SELFIE_PATH_REL / f"selfie_{ts}.jpg"
+                # save clean frame
+                cv2.imwrite(str(out_path), clean_frame)
+                selfie_trigger = False
+
+            # don't show anything else while countdown is active
+            cv2.imshow("Gesture Camera", clean_frame)
+
+            # input handling as normal
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord("q"):
+                break
+            if key == ord("r"):
+                background = capture_background(cap)
+                label_history.clear()
+
+            # skip the rest of the loop -> no other functionality during countdown
+            continue
+
+        # logic for activating functionality -> gesture needs to be held for a certain amount of time
+        if voted_label == "unknown":
+            hold_label = None
+            hold_start_time = 0
+
+        # first time the label is seen -> timer starts
+        elif voted_label != hold_label:
+            hold_label = voted_label
+            hold_start_time = now
+
+        # timer is running -> check for how long
+        else:
+            # how long the same gesture
+            hold_duration = now - hold_start_time
+            cooldown_check = (now - last_gesture_time) >= GESTURE_PAUSE_SECONDS
+
+            # gesture held long enough
+            if hold_duration >= HOLD_SECOND and cooldown_check:
+
+                # debug
+                # print(f"GESTURE ACTIVATED: {hold_label}")
+
+                # gesture specific functionality
+                if hold_label == SELFIE_TRIGGER_GESTURE:
+                    selfie_trigger = True
+                    selfie_countdown_end = now + SELFIE_COUNTDOWN
+
+                # cooldown for gesture activation
+                last_gesture_time = now
+                hold_label = None
+                hold_start_time = 0
 
         # draw the input square, hand box and label on the original frame
         cv2.rectangle(frame, (rx1, ry1), (rx2, ry2), (0, 255, 0), 2)
