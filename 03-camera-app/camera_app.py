@@ -1,3 +1,5 @@
+import argparse
+
 import time
 from datetime import datetime
 from collections import Counter, deque
@@ -13,6 +15,22 @@ from constants import *
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH_REL = BASE_DIR / MODEL_PATH
 SELFIE_PATH_REL = BASE_DIR / SELFIE_PATH
+
+
+# for arguments in command line
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--time",
+        type=float,
+        default=SELFIE_COUNTDOWN
+    )
+    parser.add_argument(
+        "--path",
+        type=str,
+        default=SELFIE_PATH
+    )
+    return parser.parse_args()
 
 
 # same preprocessing as in training
@@ -146,6 +164,15 @@ def rain_animation(frame):
 
 
 def main():
+
+    # parse arguments
+    args = parse_args()
+
+    selfie_countdown = args.time
+    selfie_path = Path(args.path)
+
+    selfie_path.mkdir(exist_ok=True)
+
     # load the model and labels
     model = load_model(str(MODEL_PATH_REL))
     labels = CONDITIONS
@@ -266,7 +293,7 @@ def main():
             if remaining <= 0:
                 # timestamp for unique filename
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                out_path = SELFIE_PATH_REL / f"selfie_{ts}.jpg"
+                out_path = selfie_path / f"selfie_{ts}.jpg"
                 # save clean frame
                 cv2.imwrite(str(out_path), clean_frame)
                 selfie_trigger = False
@@ -311,7 +338,7 @@ def main():
                 # gesture specific functionality
                 if hold_label == SELFIE_TRIGGER_GESTURE:
                     selfie_trigger = True
-                    selfie_countdown_end = now + SELFIE_COUNTDOWN
+                    selfie_countdown_end = now + selfie_countdown
 
                 elif hold_label == SEPIA_TRIGGER_GESTURE:
                     sepia = not sepia
