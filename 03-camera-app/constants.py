@@ -1,4 +1,4 @@
-## Constants for the training
+# Constants for the training
 
 CONDITIONS = ['like', 'stop', 'peace']
 
@@ -17,3 +17,20 @@ NUM_NEURONS = 64
 
 BATCH_SIZE = 8
 EPOCHS = 50
+
+MODEL_PATH = "gesture_recognition.keras"
+
+
+# Constants for the camera app
+
+CROP_WIDTH = 150
+CROP_HEIGHT = 250
+CROP_MARGIN = 20
+THRESHOLD = 0.65
+MIN_HAND_AREA_RATIO = 0.3
+
+VOTE_WINDOW = 5
+
+BACKGROUND_CAPTURE_SECONDS = 2.0
+
+DIFFERENCE_THRESHOLD = 30

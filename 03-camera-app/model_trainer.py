@@ -1,3 +1,7 @@
+# THIS SCRIPT IS BASICALLY JUST COPIED CODE FROM THE NOTEBOOK IN THE COURSE SO IT ISN'T COMPLETELY COMMENTED
+# the only changes are that it's now 3 classes and the data is stored somewhere else
+
+
 import json
 import os
 from pathlib import Path
@@ -81,6 +85,8 @@ for condition in CONDITIONS:
             labels.append(label_index)
 
 
+# test train splitting
+
 X_train, X_test, y_train, y_test = train_test_split(
     images, labels, test_size=0.2, random_state=42)
 
@@ -101,13 +107,15 @@ X_train = X_train.reshape(-1, IMG_SIZE, IMG_SIZE, COLOR_CHANNELS)
 X_test = X_test.reshape(-1, IMG_SIZE, IMG_SIZE, COLOR_CHANNELS)
 
 
+# builds the model
 def build_model():
 
     num_classes = len(label_names)
     activation = ACTIVATION
-    activation_conv = 'LeakyReLU'  # LeakyReLU doesn't work -> relu is used
+    activation_conv = 'leaky_relu'
     layer_count = LAYER_COUNT
     num_neurons = NUM_NEURONS
+    dropout = 0.05
 
     # define model structure
     # with keras, we can use a model's add() function to add layers to the network one by one
@@ -120,18 +128,18 @@ def build_model():
     # model.add(RandomRotation(0.2))
 
     # first, we add some convolution layers followed by max pooling
-    model.add(Conv2D(64, kernel_size=(9, 9), activation=activation,
+    model.add(Conv2D(64, kernel_size=(9, 9), activation=activation_conv,
               input_shape=(SIZE[0], SIZE[1], COLOR_CHANNELS), padding='same'))
     model.add(MaxPooling2D(pool_size=(4, 4), padding='same'))
 
-    model.add(Conv2D(32, (5, 5), activation=activation, padding='same'))
+    model.add(Conv2D(32, (5, 5), activation=activation_conv, padding='same'))
     model.add(MaxPooling2D(pool_size=(3, 3), padding='same'))
 
-    model.add(Conv2D(32, (3, 3), activation=activation, padding='same'))
+    model.add(Conv2D(32, (3, 3), activation=activation_conv, padding='same'))
     model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
 
     # dropout layers can drop part of the data during each epoch - this prevents overfitting
-    model.add(Dropout(0.2))
+    model.add(Dropout(dropout))
 
     # after the convolution layers, we have to flatten the data so it can be fed into fully connected layers
     model.add(Flatten())
@@ -157,10 +165,12 @@ def build_model():
 model = build_model()
 
 
+# callbacks
 reduce_lr = ReduceLROnPlateau(
     monitor='val_loss', factor=0.2, patience=2, min_lr=0.0001)
 stop_early = EarlyStopping(monitor='val_loss', patience=3)
 
+# train the model
 model.fit(
     X_train,
     train_label,
@@ -171,5 +181,5 @@ model.fit(
     callbacks=[reduce_lr, stop_early]
 )
 
-
-model.save('gesture_recognition.keras')
+# save the model
+model.save(MODEL_PATH)
