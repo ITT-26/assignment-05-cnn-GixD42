@@ -75,7 +75,7 @@ def capture_background(cap):
             (20, 40),
             cv2.FONT_HERSHEY_SIMPLEX,
             1,
-            (0, 255, 0),
+            UI_TEXT_COLOR,
             2,
         )
 
@@ -258,7 +258,7 @@ def main():
                     (20, 40),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     1,
-                    (0, 255, 0),
+                    UI_TEXT_COLOR,
                     2,
                 )
 
@@ -325,7 +325,7 @@ def main():
                 hold_start_time = 0
 
         # draw the input square, hand box and label on the original frame
-        cv2.rectangle(frame, (rx1, ry1), (rx2, ry2), (0, 255, 0), 2)
+        cv2.rectangle(frame, (rx1, ry1), (rx2, ry2), UI_TEXT_COLOR, 2)
 
         if hand_box is not None:
             hx, hy, hw, hh = hand_box
@@ -359,7 +359,7 @@ def main():
             (20, 40),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
-            (0, 255, 0),
+            UI_TEXT_COLOR,
             2,
         )
 
@@ -370,7 +370,7 @@ def main():
             (20, 70),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
-            (0, 255, 0),
+            UI_TEXT_COLOR,
             2,
         )
 
