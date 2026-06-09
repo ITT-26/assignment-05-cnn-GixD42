@@ -28,7 +28,7 @@ def parse_args():
     parser.add_argument(
         "--path",
         type=str,
-        default=SELFIE_PATH
+        default=SELFIE_PATH_REL
     )
     return parser.parse_args()
 
@@ -75,12 +75,14 @@ def capture_background(cap):
             frame = cv2.flip(frame, 1)
 
         # crop to the input square
-        input_area, _ = crop_input_area(frame)
-        if input_area is None or input_area.size == 0:
-            continue
+        input_area, (x1, y1, x2, y2) = crop_input_area(frame)
+        input_area_copy = input_area.copy()
+
+        # show input area
+        cv2.rectangle(frame, (x1, y1), (x2, y2), UI_TEXT_COLOR, 2)
 
         # add to background frames
-        frames.append(input_area.astype(np.float32))
+        frames.append(input_area_copy.astype(np.float32))
 
         # remaining time
         remaining = max(0.0, BACKGROUND_CAPTURE_SECONDS -
@@ -360,7 +362,7 @@ def main():
                 frame,
                 (rx1 + hx, ry1 + hy),
                 (rx1 + hx + hw, ry1 + hy + hh),
-                (255, 0, 0),
+                HAND_BOX_COLOR,
                 2,
             )
 
@@ -370,6 +372,18 @@ def main():
         if cooldown_active:
             display_gesture = "cooldown"
             hold_time = 0.0
+
+            # show that it's in cooldown
+            cv2.putText(
+                frame,
+                f'COOLDOWN ACTIVE',
+                (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                UI_TEXT_COLOR,
+                2,
+            )
+
         # no cooldown show the user the gesture and how long they are holding it
         else:
             display_gesture = hold_label if hold_label is not None else voted_label
@@ -379,27 +393,27 @@ def main():
             if hold_label is not None and hold_start_time > 0:
                 hold_time = max(0.0, now - hold_start_time)
 
-        # instructions
-        cv2.putText(
-            frame,
-            f'You need to hold gestures for {HOLD_SECOND:.1f}s',
-            (20, 40),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            UI_TEXT_COLOR,
-            2,
-        )
+            # instructions
+            cv2.putText(
+                frame,
+                f'You need to hold gestures for {HOLD_SECOND:.1f}s',
+                (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                UI_TEXT_COLOR,
+                2,
+            )
 
-        # gesture feedback
-        cv2.putText(
-            frame,
-            f'Gesture: {display_gesture} | Time: {hold_time:.1f}s',
-            (20, 70),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            UI_TEXT_COLOR,
-            2,
-        )
+            # gesture feedback
+            cv2.putText(
+                frame,
+                f'Gesture: {display_gesture} | Time: {hold_time:.1f}s',
+                (20, 70),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                UI_TEXT_COLOR,
+                2,
+            )
 
         # show the frame
         cv2.imshow("Gesture Camera", frame)

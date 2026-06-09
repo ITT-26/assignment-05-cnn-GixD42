@@ -1,5 +1,6 @@
-*.jpg
-*.json
+data/**/*.jpg
+data/**/*.json
 *.zip
 *.pyc
 03-camera-app/gesture_detection.ipynb
+03-camera-app/selfies/

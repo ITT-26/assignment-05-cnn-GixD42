@@ -25,6 +25,7 @@ MODEL_PATH = "gesture_recognition.keras"
 # Constants for the camera app
 
 UI_TEXT_COLOR = (0, 255, 0)
+HAND_BOX_COLOR = (255, 0, 0)
 
 CAMERA_FLIP = True
 
