@@ -45,7 +45,10 @@ def preprocess_image(img):
 def crop_input_area(frame):
     h, w = frame.shape[:2]
 
-    x1 = w - CROP_WIDTH - CROP_MARGIN
+    if RIGHT_HAND:
+        x1 = w - CROP_WIDTH - CROP_MARGIN
+    else:
+        x1 = CROP_MARGIN
     y1 = h - CROP_HEIGHT - CROP_MARGIN
 
     x1 = max(0, min(x1, w - 1))

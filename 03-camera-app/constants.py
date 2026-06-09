@@ -29,6 +29,8 @@ HAND_BOX_COLOR = (255, 0, 0)
 
 CAMERA_FLIP = True
 
+RIGHT_HAND = True
+
 SELFIE_PATH = "selfies"
 
 SELFIE_TRIGGER_GESTURE = "like"
