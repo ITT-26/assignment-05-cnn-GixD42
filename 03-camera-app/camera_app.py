@@ -207,8 +207,14 @@ def main():
         raw_label = "unknown"
         confidence = 0.0
 
-        # Only recognize if a hand box was found
-        if hand_box is not None and hand_crop is not None:
+        # logic for activating functionality
+        now = time.time()
+
+        # cooldown check for preventing "gesture stacking"
+        cooldown_active = (now - last_gesture_time) < GESTURE_PAUSE_SECONDS
+
+        # Only recognize if a hand box was found and if the cooldown is not running
+        if not cooldown_active and hand_box is not None and hand_crop is not None:
 
             # preprocess the hand crop and predict with the model
             input_frame = preprocess_image(hand_crop)
@@ -223,14 +229,19 @@ def main():
             if confidence >= THRESHOLD:
                 raw_label = labels[idx]
 
-        # in history for voting
-        label_history.append(raw_label)
+        # cooldown -> clear history and reset labels
+        if cooldown_active:
+            label_history.clear()
+            voted_label = "unknown"
+            hold_label = None
+            hold_start_time = 0
+        # no cooldown -> ready for voting
+        else:
+            # in history for voting
+            label_history.append(raw_label)
 
-        # voted label is the most common label in the history
-        voted_label = Counter(label_history).most_common(1)[0][0]
-
-        # logic for activating functionality
-        now = time.time()
+            # voted label is the most common label in the history
+            voted_label = Counter(label_history).most_common(1)[0][0]
 
         # if a selfie is about to be taken, nothing else should be happening
         if selfie_trigger:
@@ -275,6 +286,8 @@ def main():
             continue
 
         # logic for activating functionality -> gesture needs to be held for a certain amount of time
+
+        # no gesture -> reset hold label and timer
         if voted_label == "unknown":
             hold_label = None
             hold_start_time = 0
@@ -288,10 +301,9 @@ def main():
         else:
             # how long the same gesture
             hold_duration = now - hold_start_time
-            cooldown_check = (now - last_gesture_time) >= GESTURE_PAUSE_SECONDS
 
             # gesture held long enough
-            if hold_duration >= HOLD_SECOND and cooldown_check:
+            if hold_duration >= HOLD_SECOND and not cooldown_active:
 
                 # debug
                 # print(f"GESTURE ACTIVATED: {hold_label}")
@@ -325,13 +337,39 @@ def main():
                 2,
             )
 
-        # output text
+        # instructions and current label
+
+        # cooldown active -> let user know that no gestures will be registered for a moment
+        if cooldown_active:
+            display_gesture = "cooldown"
+            hold_time = 0.0
+        # no cooldown show the user the gesture and how long they are holding it
+        else:
+            display_gesture = hold_label if hold_label is not None else voted_label
+
+            # hold time to show user how long they are holding the gesture
+            hold_time = 0.0
+            if hold_label is not None and hold_start_time > 0:
+                hold_time = max(0.0, now - hold_start_time)
+
+        # instructions
         cv2.putText(
             frame,
-            f"Gesture: {voted_label} ({confidence:.2f})",
+            f'You need to hold gestures for {HOLD_SECOND:.1f}s',
             (20, 40),
             cv2.FONT_HERSHEY_SIMPLEX,
-            1,
+            0.7,
+            (0, 255, 0),
+            2,
+        )
+
+        # gesture feedback
+        cv2.putText(
+            frame,
+            f'Gesture: {display_gesture} | Time: {hold_time:.1f}s',
+            (20, 70),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
             (0, 255, 0),
             2,
         )
