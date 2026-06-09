@@ -1,6 +1,6 @@
 # Constants for the training
 
-CONDITIONS = ['like', 'stop', 'peace']
+CONDITIONS = ['like', 'stop', 'dislike']
 
 # image size
 IMG_SIZE = 64
@@ -30,7 +30,7 @@ SELFIE_PATH = "selfies"
 
 SELFIE_TRIGGER_GESTURE = "like"
 SEPIA_TRIGGER_GESTURE = "stop"
-ANIMATION_TRIGGER_GESTURE = "peace"
+ANIMATION_TRIGGER_GESTURE = "dislike"
 
 CROP_WIDTH = 150
 CROP_HEIGHT = 200

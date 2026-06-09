@@ -134,6 +134,17 @@ def sepia_filter(frame):
     return sepia
 
 
+# make rain animation the frame
+def rain_animation(frame):
+    h, w = frame.shape[:2]
+    # draw random lines to make it look like it's raining
+    for _ in range(100):
+        x = np.random.randint(0, w)
+        y = np.random.randint(0, h)
+        length = np.random.randint(10, 30)
+        cv2.line(frame, (x, y), (x, y + length), (255, 255, 255), 1)
+
+
 def main():
     # load the model and labels
     model = load_model(str(MODEL_PATH_REL))
@@ -162,6 +173,9 @@ def main():
     # sepia flag
     sepia = False
 
+    # rain flag
+    rain = False
+
     # loop
     while True:
 
@@ -176,6 +190,10 @@ def main():
         # apply sepia
         if sepia:
             frame = sepia_filter(frame)
+
+        # apply rain
+        if rain:
+            rain_animation(frame)
 
         # frame without ui elements
         clean_frame = frame.copy()
@@ -285,6 +303,9 @@ def main():
 
                 elif hold_label == SEPIA_TRIGGER_GESTURE:
                     sepia = not sepia
+
+                elif hold_label == ANIMATION_TRIGGER_GESTURE:
+                    rain = not rain
 
                 # cooldown for gesture activation
                 last_gesture_time = now
