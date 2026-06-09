@@ -124,6 +124,16 @@ def crop_hand_with_static_bg(input_area, background):
     return hand, (x, y, w, h)
 
 
+# sepia filter from https://amin-ahmadi.com/2016/03/24/sepia-filter-opencv/
+def sepia_filter(frame):
+    kernel = np.array([[0.272, 0.534, 0.131],
+                       [0.349, 0.686, 0.168],
+                       [0.393, 0.769, 0.189]])
+    sepia = cv2.transform(frame, kernel)
+    sepia = np.clip(sepia, 0, 255).astype(np.uint8)
+    return sepia
+
+
 def main():
     # load the model and labels
     model = load_model(str(MODEL_PATH_REL))
@@ -149,6 +159,9 @@ def main():
     selfie_trigger = False
     selfie_countdown_end = 0
 
+    # sepia flag
+    sepia = False
+
     # loop
     while True:
 
@@ -159,6 +172,10 @@ def main():
 
         if CAMERA_FLIP:
             frame = cv2.flip(frame, 1)
+
+        # apply sepia
+        if sepia:
+            frame = sepia_filter(frame)
 
         # frame without ui elements
         clean_frame = frame.copy()
@@ -265,6 +282,9 @@ def main():
                 if hold_label == SELFIE_TRIGGER_GESTURE:
                     selfie_trigger = True
                     selfie_countdown_end = now + SELFIE_COUNTDOWN
+
+                elif hold_label == SEPIA_TRIGGER_GESTURE:
+                    sepia = not sepia
 
                 # cooldown for gesture activation
                 last_gesture_time = now
